@@ -1,0 +1,6 @@
+project/.tmp_data
+project/logfiles
+.history
+*.pyc
+*/__pycache__
+
