@@ -1,0 +1,1 @@
+DATA_SOURCE_ACCIDENTS = 'https://www.opengeodata.nrw.de/produkte/transport_verkehr/unfallatlas'
