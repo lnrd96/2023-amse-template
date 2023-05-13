@@ -1,5 +1,6 @@
 project/.tmp_data
 project/logfiles
+project/database/data.sqlite3
 .history
 *.pyc
 */__pycache__
