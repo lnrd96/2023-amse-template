@@ -3,12 +3,17 @@ import re
 import shutil
 import logging
 import zipfile
+import time
 import requests
 import pandas as pd
 
+from database.model import Accident, Participants, Coordinate
+from utils.CustomExceptions import RoadTypeNotFount
+from typing import Tuple
+from decimal import Decimal
 from tqdm import tqdm
 from datetime import datetime
-from config import DATA_SOURCE_ACCIDENTS
+from config import DATA_SOURCE_ACCIDENTS, DATA_SOURCE_ROAD_TYPES
 
 
 class Pipeline:
@@ -18,19 +23,95 @@ class Pipeline:
         os.chdir(os.path.join('2023-amse-template', 'project'))
         # set up logging
         self._setup_logging()
-        
-    def preprocess(self, data: pd.DataFrame):
-        pass
-        # select useful columns
-        # datetime format conversion
-        
-        
-        
-        # dt = datetime.datetime(year, month, day, hour)
-        # # Create an instance of YourModel and assign the datetime value to your_datetime_field
-        # model_instance = YourModel(your_datetime_field=dt)
 
-    def scrape_data(self) -> pd.DataFrame:
+    def preprocess(self, df: pd.DataFrame):
+        # drop some attributes
+        df = df.drop(['OBJECTID_1', 'UART', 'UTYP', 'UGEMEINDE',
+                      'UKREIS', 'ULAND', 'UREGBEZ', 'UTYP1']) 
+        return df
+
+    def accident_data_to_db(self, df: pd.DataFrame):
+        n_fails, n_success = 0, 0
+        for frame in df.itertuples(index=False):
+            frame = frame._asdict()
+            participants = \
+                Participants.create(predestrian=bool(frame['IstFuss']),
+                                    truck=bool(frame['IstGkfz']),
+                                    motorcycle=bool(frame['IstKrad']),
+                                    bike=bool(frame['IstRad']),
+                                    other=bool(frame['IstSonstig']))
+            coordinate = \
+                Coordinate.create(utm_zone='32N',
+                                  utm_x=Decimal(frame['LINREFX'].replace(',', '.')),
+                                  utm_y=Decimal(frame['LINREFY'].replace(',', '.')),
+                                  wsg_long=Decimal(frame['XGCSWGS84'].replace(',', '.')),
+                                  wsg_lat=Decimal(frame['YGCSWGS84'].replace(',', '.')))
+            try:
+                osm_type, parsed_type = self.get_road_type_from_coordinate(latitude=coordinate.wsg_lat,
+                                                                           longitude=coordinate.wsg_long)
+            except RoadTypeNotFount as e:
+                n_fails += 1
+                participants.delete_instance()
+                coordinate.delete_instance()
+
+            Accident.create(road_state=frame['STRZUSTAND'],
+                            severeness=frame['UKATEGORIE'] - 1,  # such that all $\in [0,2]$.
+                            lighting_confitions=frame['ULICHTVERH'],
+                            road_type_osm=osm_type,
+                            road_type_parsed_type=parsed_type,
+                            involved=participants,
+                            location=coordinate)
+
+
+    def get_road_type_from_coordinate(self, latitude: float, longitude: float) -> Tuple[str, str]:
+        """ Queries Open Street Map (OSM) using Nominatim's Reverse Geocoding to
+            get the road type of the coordinate.
+
+        Args:
+            latidude (float): Coordinate component.
+            longitude (float): Coordinate component.
+
+        Raises:
+            RoadTypeNotFount: In case the API query failed.
+
+        Returns:
+            Tuple[str, str]: Two possible road types for the coordinate.
+                             First one is OSM's road type.
+                             See "https://wiki.openstreetmap.org/wiki/Key:highway#Highway".
+                             Second one is road type parsed out of road name.
+        """
+        # format API URL
+        url = DATA_SOURCE_ROAD_TYPES.format(latidude=latitude, longidude=longitude)
+        # query API
+        response = requests.get(url)
+        if response.status_code == 200:
+            # get response as JSON
+            data = response.json()
+            # sanity checks
+            if data['osm_type'] != 'way' or data['category'] != 'highway':
+                raise RoadTypeNotFount('Not a road.')
+            # the open street map road type
+            osm_road_type = data['type']
+            # semantically parse the road name to assign a road
+            road_name = data['address']['road']
+            if re.match(r'^A\s*\d+$', road_name):
+                extracted_road_type = 'Highway'  # Autobahn
+            elif re.match(r'^B\s*\d+$', road_name):
+                extracted_road_type = 'National Road'  # Bundesstrasse
+            elif re.match(r'^L\s*\d+$', road_name):
+                # Take me home to the plaaace I beloong
+                extracted_road_type = 'Country Road'  # Landstrasse
+            elif re.match(r'^[A-Z]+\s\d+$', road_name):
+                extracted_road_type = 'Distict Road'  # Kreisstrasse
+            else:
+                extracted_road_type = 'Residential Road'  # Wohngebiet
+        else:
+            raise RoadTypeNotFount('API query failed.')
+            logging.info(f'Error querying road type: HTML Response {response.status_code}.')
+        # return result
+        return osm_road_type, extracted_road_type
+
+    def scrape_accident_data(self) -> pd.DataFrame:
         """ Downloads and unifies all datasets from the URI
             defined in the config file.
 
@@ -49,7 +130,7 @@ class Pipeline:
         response = requests.get(DATA_SOURCE_ACCIDENTS)
         metadata = response.json()
 
-        # scrape metadata for all present datasets
+        # scrape metadata for all present datasets and download them
         for dataset in tqdm(metadata["datasets"]):
             for file in dataset["files"]:
                 # filter for correct files
@@ -74,6 +155,7 @@ class Pipeline:
                     except Exception as e:
                         logging.error(f'Error moving file. {e.args[0]}')
 
+        # filter for useful files
         for root, dirs, files in os.walk(".", topdown=False):
             if len(files) == 2:
                 for file in files:
@@ -87,28 +169,21 @@ class Pipeline:
                     if file.endswith('.csv') and 'LinRef' in file:
                         shutil.move(os.path.join(root, file), target_directory)
 
-        # read data content
+        # read data content into pandas dataframe
         files = os.listdir(target_directory)
-        data_files = [file for file in files 
+        data_files = [file for file in files
                       if re.match(r'^Unfallorte\d{4}_LinRef\.(?:csv|txt)$', file)]
-
-        # TODO
         data_frames = []
         for csv_file in data_files:
             csv_path = os.path.join(target_directory, csv_file)
             df = pd.read_csv(csv_path, delimiter=";")
             data_frames.append(df)
 
-        # Concatenate all the data frames into a single data frame
+        # concatenate all the data frames into a single data frame
         combined_df = pd.concat(data_frames)
-        df.to_csv('unfallorte_all.csv', index=False)
+        df.to_csv('unfallorte_all.csv', index=False)  # TODO: This is debug code
 
-        # Perform any desired operations on the combined data frame
-
-        # Example: Print the first few rows of the combined data frame
-        print(combined_df.head())
-
-        # Remove temp dir
+        # remove artifacts
         os.rmdir(target_directory)  # TODO: Error: Dir not empty
 
     def _setup_logging(self):
@@ -118,8 +193,11 @@ class Pipeline:
                             format='%(name)s - %(levelname)s - %(message)s',
                             level=logging.INFO)
 
-
 if __name__ == '__main__':
-    # Pipeline().scrape_data()
-    df = pd.read_csv('unfallorte_all.csv')
-    Pipeline().preprocess(df)
+    pass
+    # # Usage
+    # p = Pipeline()
+    # df = p.scrape_data()
+    # df = p.preprocess(df)
+    # p.accident_data_to_db(df)
+    # p.wheather_data_to_db()
