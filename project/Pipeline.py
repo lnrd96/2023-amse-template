@@ -45,20 +45,20 @@ class Pipeline:
                                Optionally preprocessed by `preprocess`.
         """
         n_fails, n_success = 0, 0
-        for frame in df.itertuples(index=False):
+        for frame in tqdm(df.itertuples(index=False)):
             frame = frame._asdict()
-            participants = \
-                Participants.create(predestrian=bool(frame['IstFuss']),
-                                    truck=bool(frame['IstGkfz']),
-                                    motorcycle=bool(frame['IstKrad']),
-                                    bike=bool(frame['IstRad']),
-                                    other=bool(frame['IstSonstig']))
-            coordinate = \
-                Coordinate.create(utm_zone='32N',
-                                  utm_x=Decimal(frame['LINREFX'].replace(',', '.')),
-                                  utm_y=Decimal(frame['LINREFY'].replace(',', '.')),
-                                  wsg_long=Decimal(frame['XGCSWGS84'].replace(',', '.')),
-                                  wsg_lat=Decimal(frame['YGCSWGS84'].replace(',', '.')))
+            participants, _ = \
+                Participants.get_or_create(predestrian=bool(frame['IstFuss']),
+                                           truck=bool(frame['IstGkfz']),
+                                           motorcycle=bool(frame['IstKrad']),
+                                           bike=bool(frame['IstRad']),
+                                           other=bool(frame['IstSonstig']))
+            coordinate, _ = \
+                Coordinate.get_or_create(utm_zone='32N',
+                                         utm_x=Decimal(frame['LINREFX'].replace(',', '.')),
+                                         utm_y=Decimal(frame['LINREFY'].replace(',', '.')),
+                                         wsg_long=Decimal(frame['XGCSWGS84'].replace(',', '.')),
+                                         wsg_lat=Decimal(frame['YGCSWGS84'].replace(',', '.')))
             try:
                 osm_type, parsed_type = self.get_road_type_from_coordinate(latitude=coordinate.wsg_lat,
                                                                            longitude=coordinate.wsg_long)
@@ -68,14 +68,16 @@ class Pipeline:
                 participants.delete_instance()
                 coordinate.delete_instance()
 
-            Accident.create(road_state=frame['STRZUSTAND'],
-                            severeness=frame['UKATEGORIE'] - 1,  # such that all $\in [0,2]$.
-                            lighting_confitions=frame['ULICHTVERH'],
-                            road_type_osm=osm_type,
-                            road_type_parsed_type=parsed_type,
-                            involved=participants,
-                            location=coordinate)
+            Accident.get_or_create(road_state=frame['STRZUSTAND'],
+                                   severeness=frame['UKATEGORIE'] - 1,  # such that all $\in [0,2]$.
+                                   lighting_conditions=frame['ULICHTVERH'],
+                                   road_type_osm=osm_type,
+                                   road_type_parsed=parsed_type,
+                                   involved=participants,
+                                   location=coordinate)
             n_success += 1
+            if n_success % 500 == 0:
+                logging.info(f'Created {n_success} entries out of {len(df)}.')
 
         logging.info('_' * 50 + '\n' + f'Added {n_success} entries to the database. {n_fails} potential entries were'
                      'not added due to query issues.' + '\n' + '_' * 50)
@@ -89,18 +91,26 @@ class Pipeline:
             longitude (float): Coordinate component.
 
         Raises:
-            RoadTypeNotFount: In case the API query failed.
+            RoadTypeNotFount: In case the API query failed or the given
+                              coordinate is not on a road.
 
         Returns:
             Tuple[str, str]: Two possible road types for the coordinate.
                              First one is OSM's road type.
                              See "https://wiki.openstreetmap.org/wiki/Key:highway#Highway".
                              Second one is road type parsed out of road name.
+                             It will be 'undefined' in case road name was not available.
         """
         # format API URL
         url = DATA_SOURCE_ROAD_TYPES.format(latidude=latitude, longidude=longitude)
         # query API
-        response = requests.get(url)
+        while True:
+            try:
+                response = requests.get(url)
+                logging.info('Connection reset by peer. Retrying in 100 seconds.')
+                break
+            except ConnectionError:
+                time.sleep(100)
         if response.status_code == 200:
             # get response as JSON
             data = response.json()
@@ -109,8 +119,13 @@ class Pipeline:
                 raise RoadTypeNotFount('Not a road.')
             # the open street map road type
             osm_road_type = data['type']
-            # semantically parse the road name to assign a road
-            road_name = data['address']['road']
+            # semantically parse the road name to assign a road type
+            try:
+                road_name = data['address']['road']
+            except KeyError:
+                logging.info(f'Road name not available by OSM.')
+                return osm_road_type, 'undefined'
+                
             if re.match(r'^A\s*\d+$', road_name):
                 extracted_road_type = 'Highway'  # Autobahn
             elif re.match(r'^B\s*\d+$', road_name):
