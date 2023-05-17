@@ -17,20 +17,33 @@ from config import DATA_SOURCE_ACCIDENTS, DATA_SOURCE_ROAD_TYPES
 
 
 class Pipeline:
-    """ Class to pull, preprocess (massage) and store the data. """
     def __init__(self):
+        """ Class to pull, preprocess (massage) and store the data. """
         # set working directory
         os.chdir(os.path.join('2023-amse-template', 'project'))
         # set up logging
         self._setup_logging()
 
-    def preprocess(self, df: pd.DataFrame):
-        # drop some attributes
-        df = df.drop(['OBJECTID_1', 'UART', 'UTYP', 'UGEMEINDE',
-                      'UKREIS', 'ULAND', 'UREGBEZ', 'UTYP1']) 
+    def preprocess(self, df: pd.DataFrame) -> pd.DataFrame:
+        """ Preprocessing the scraped data.
+
+        Args:
+            df (pd.DataFrame): Data to preprocess.
+
+        Returns:
+            pd.dataFrame: The preprocessed data.
+        """
         return df
 
-    def accident_data_to_db(self, df: pd.DataFrame):
+    def data_to_db(self, df: pd.DataFrame):
+        """ Feeds the data present in the given dataframe into the database.
+            Uses `get_road_type_from_coordinate` to add road type info to
+            accidents.
+
+        Args:
+            df (pd.DataFrame): The data scraped by `scrape_accident_data`.
+                               Optionally preprocessed by `preprocess`.
+        """
         n_fails, n_success = 0, 0
         for frame in df.itertuples(index=False):
             frame = frame._asdict()
@@ -50,6 +63,7 @@ class Pipeline:
                 osm_type, parsed_type = self.get_road_type_from_coordinate(latitude=coordinate.wsg_lat,
                                                                            longitude=coordinate.wsg_long)
             except RoadTypeNotFount as e:
+                logging.info(e)
                 n_fails += 1
                 participants.delete_instance()
                 coordinate.delete_instance()
@@ -61,7 +75,10 @@ class Pipeline:
                             road_type_parsed_type=parsed_type,
                             involved=participants,
                             location=coordinate)
+            n_success += 1
 
+        logging.info('_' * 50 + '\n' + f'Added {n_success} entries to the database. {n_fails} potential entries were'
+                     'not added due to query issues.' + '\n' + '_' * 50)
 
     def get_road_type_from_coordinate(self, latitude: float, longitude: float) -> Tuple[str, str]:
         """ Queries Open Street Map (OSM) using Nominatim's Reverse Geocoding to
@@ -156,7 +173,7 @@ class Pipeline:
                         logging.error(f'Error moving file. {e.args[0]}')
 
         # filter for useful files
-        for root, dirs, files in os.walk(".", topdown=False):
+        for root, dirs, files in os.walk('.tmp_data', topdown=False):
             if len(files) == 2:
                 for file in files:
                     if file.endswith('.csv') or file.endswith('.txt') and 'LinRef' in file:
@@ -181,10 +198,11 @@ class Pipeline:
 
         # concatenate all the data frames into a single data frame
         combined_df = pd.concat(data_frames)
-        df.to_csv('unfallorte_all.csv', index=False)  # TODO: This is debug code
+        combined_df.to_csv('unfallorte_all.csv', index=False)
+        return combined_df
 
         # remove artifacts
-        os.rmdir(target_directory)  # TODO: Error: Dir not empty
+        shutil.rmtree(target_directory, ignore_errors=True)
 
     def _setup_logging(self):
         f_id = datetime.now().strftime("%m.%d.%Y_%H:%M:%S")
@@ -192,12 +210,4 @@ class Pipeline:
         logging.basicConfig(filename=filename, filemode='w',
                             format='%(name)s - %(levelname)s - %(message)s',
                             level=logging.INFO)
-
-if __name__ == '__main__':
-    pass
-    # # Usage
-    # p = Pipeline()
-    # df = p.scrape_data()
-    # df = p.preprocess(df)
-    # p.accident_data_to_db(df)
-    # p.wheather_data_to_db()
+        print(f'Logfile is at "{os.path.abspath(filename)}"')
