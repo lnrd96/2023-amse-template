@@ -36,7 +36,12 @@ class DatabaseHandler():
         print(f'Succesfully generated database: "{DB.database}".')
 
     def reset_database(self):
-        raise NotImplementedError()
+        if os.path.exists(DB.database):
+            os.remove(DB.database)
+            print('Deleted old database.')
+        else:
+            print('Database not found. Creating new database.')
+        self.initialize_database()
 
     def alter_scheme(self):
         raise NotImplementedError()
