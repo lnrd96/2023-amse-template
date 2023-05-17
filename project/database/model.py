@@ -1,9 +1,11 @@
+import os
+from config import PROJECT_ROOT
 from peewee import *
 
-DB = SqliteDatabase('data.sqlite')
+DB = SqliteDatabase(os.path.join(PROJECT_ROOT, 'database', 'data.sqlite'))
 
 
-class InvolvedParticipants(Model):
+class Participants(Model):
     """ Type of participants involved into the accident. """
     predestrian = BooleanField()
     truck = BooleanField()  # Gkfz
@@ -23,11 +25,11 @@ class Coordinate(Model):
 
         WGS84 World Geodetic System 1984)
     """
-    utm_zone = IntegerField()
+    utm_zone = CharField()
     utm_x = DecimalField(max_digits=7, decimal_places=1, auto_round=True)
     utm_y = DecimalField(max_digits=7, decimal_places=1, auto_round=True)
-    wsg_long = DecimalField(max_digits=8, decimal_places=6, auto_round=True)
-    wsg_lat = DecimalField(max_digits=8, decimal_places=6, auto_round=True)
+    wsg_long = DecimalField(max_digits=8, decimal_places=6, auto_round=True)  # x
+    wsg_lat = DecimalField(max_digits=8, decimal_places=6, auto_round=True)  # y
 
     class Meta:
         database = DB
@@ -39,9 +41,10 @@ class Accident(Model):
     """
     road_state = IntegerField()  # 0:=dry, 1:=wet, 2:=frozen
     severeness = IntegerField()  # 0:=minor injuries, 1:= major injuries, 2:= deadly UKATEGORIE (TODO: transform encoding)
-    time = DateField()
     lighting_conditions = IntegerField()  # 0:=daylight, 1:=dusk, 2:=dark
-    involved = ForeignKeyField(InvolvedParticipants)
+    road_type_osm = CharField()
+    toad_type_parsed = CharField()
+    involved = ForeignKeyField(Participants)
     location = ForeignKeyField(Coordinate)
 
     class Meta:
