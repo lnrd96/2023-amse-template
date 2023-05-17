@@ -1,0 +1,2 @@
+class RoadTypeNotFount(BaseException):
+    pass
