@@ -1,4 +1,6 @@
 import subprocess
+import sys
+subprocess.Popen([sys.executable, '-m', 'pip', 'install', 'requests'])
 import pandas as pd
 import requests
 import sqlite3
@@ -49,5 +51,4 @@ def automated_data_pipeline():
 
 
 if __name__ == '__main__':
-    subprocess.Popen(['python3', '-m', 'pip', 'install', 'requests'])
     automated_data_pipeline()
