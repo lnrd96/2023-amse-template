@@ -1,8 +1,5 @@
-import subprocess
 import sys
-subprocess.Popen([sys.executable, '-m', 'pip', 'install', 'requests'])
 import pandas as pd
-import requests
 import sqlite3
 import io
 
