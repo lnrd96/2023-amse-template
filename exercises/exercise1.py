@@ -13,17 +13,7 @@ TABLE_NAME = 'airports'
 
 def automated_data_pipeline():
 
-    # download data
-    response = requests.get(DATA_URI)
-    if response.status_code != 200:
-        print('Error downloading data from %s: %s' % (DATA_URI, response.status_code))
-        return
-    else:
-        print('Successfully downloaded data.')
-
-    # convert data to pandas dataframe
-    data = io.BytesIO(response.content)
-    df = pd.read_csv(data, delimiter=';')
+    df = pd.read_csv(DATA_URI, delimiter=';')
     print('Loaded data into pandas dataframe.')
 
     # assign fitting built-in SQLite types to all columns
