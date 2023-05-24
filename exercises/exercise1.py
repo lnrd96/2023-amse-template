@@ -14,7 +14,7 @@ def automated_data_pipeline():
     print('Loaded data into pandas dataframe.')
 
     # assign fitting built-in SQLite types to all columns
-    df = df.drop(columns=['geo_punkt'])  # one fact in one place
+    # df = df.drop(columns=['geo_punkt'])  # one fact in one place
     column_types = {
         'column1': 'INTEGER',
         'column2': 'TEXT',
@@ -28,6 +28,7 @@ def automated_data_pipeline():
         'column10': 'REAL',
         'column11': 'TEXT',
         'column12': 'TEXT',
+        'geo_punkt': 'TEXT'
     }
 
     # persist data into database, directly from pandas
