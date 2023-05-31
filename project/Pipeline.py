@@ -8,7 +8,7 @@ import requests
 import pandas as pd
 
 from database.model import Accident, Participants, Coordinate
-from utils.CustomExceptions import RoadTypeNotFount
+from utils.CustomExceptions import RoadTypeNotFound
 from typing import Tuple
 from decimal import Decimal
 from tqdm import tqdm
@@ -19,10 +19,11 @@ from config import DATA_SOURCE_ACCIDENTS, DATA_SOURCE_ROAD_TYPES
 class Pipeline:
     def __init__(self):
         """ Class to pull, preprocess (massage) and store the data. """
-        # set working directory
-        os.chdir(os.path.join('2023-amse-template', 'project'))
+        # # set working directory
+        # os.chdir(os.path.join('2023-amse-template', 'project'))
         # set up logging
         self._setup_logging()
+        self.logfile: str
 
     def preprocess(self, df: pd.DataFrame) -> pd.DataFrame:
         """ Preprocessing the scraped data.
@@ -72,17 +73,20 @@ class Pipeline:
                                          utm_y=Decimal(frame['LINREFY'].replace(',', '.')),
                                          wsg_long=Decimal(frame['XGCSWGS84'].replace(',', '.')),
                                          wsg_lat=Decimal(frame['YGCSWGS84'].replace(',', '.')))
+            # see if road type to that coordinate alread exists
             if (coordinate.wsg_long, coordinate.wsg_lat) in coordinate_lookup_table:
                 osm_type, parsed_type = coordinate_lookup_table[(coordinate.wsg_long, coordinate.wsg_lat)]
+            # otherwise, query it from osm
             else:
                 try:
                     n_queried += 1
                     osm_type, parsed_type = self.get_road_type_from_coordinate(latitude=coordinate.wsg_lat,
                                                                                longitude=coordinate.wsg_long)
-                except RoadTypeNotFount as e:
+                except RoadTypeNotFound as e:
                     logging.info(e)
                     n_fails += 1
-                    break
+                    continue
+
 
             Accident.get_or_create(road_state=frame['STRZUSTAND'],
                                    severeness=frame['UKATEGORIE'] - 1,  # such that all $\in [0,2]$.
@@ -91,18 +95,19 @@ class Pipeline:
                                    road_type_parsed=parsed_type,
                                    involved=participants,
                                    location=coordinate,
-                                   year=frame['UJAHR'], month=frame['UMONAT'],
-                                   hour=frame['UMONTH'], weekday=['UWOCHENTAG'])
+                                   year=int(frame['UJAHR']), month=int(frame['UMONAT']),
+                                   hour=int(frame['USTUNDE']), weekday=int(frame['UWOCHENTAG']))
             n_success += 1
             if n_queried % 100 == 0:
                 logging.info(f'Queried the OSM server {n_queried} times.')
             if n_success % 100 == 0:
                 logging.info(f'Created {n_success} entries out of {len(df)}.')
+                logging.info(f'{n_fails} OSM queries failed.')
 
-        logging.info('_' * 50 + '\n' + f'Added {n_success} entries to the database. {n_fails} potential entries were'
+        logging.info('\n' + '_' * 50 + '\n' + f'Added {n_success} entries to the database. {n_fails} potential entries were '
                      'not added due to query issues.' + '\n' + '_' * 50)
 
-    def get_road_type_from_coordinate(self, latitude: float, longitude: float) -> Tuple[str, str]:
+    def get_road_type_from_coordinate(self, latitude: float, longitude: float, retry=True) -> Tuple[str, str]:
         """ Queries Open Street Map (OSM) using Nominatim's Reverse Geocoding to
             get the road type of the coordinate.
 
@@ -136,7 +141,7 @@ class Pipeline:
             data = response.json()
             # sanity checks
             if data['osm_type'] != 'way' or data['category'] != 'highway':
-                raise RoadTypeNotFount('Not a road.')
+                raise RoadTypeNotFound('Not a road.')
             # the open street map road type
             osm_road_type = data['type']
             # semantically parse the road name to assign a road type
@@ -158,8 +163,12 @@ class Pipeline:
             else:
                 extracted_road_type = 'Residential Road'  # Wohngebiet
         else:
-            raise RoadTypeNotFount('API query failed.')
             logging.info(f'Error querying road type: HTML Response {response.status_code}.')
+            if not retry:
+                raise RoadTypeNotFound('API query failed.')
+            logging.info('Retrying in one minute.')
+            time.sleep(60)
+            return self.get_road_type_from_coordinate(latitude, longitude, retry=False)
         # return result
         return osm_road_type, extracted_road_type
 
@@ -245,4 +254,4 @@ class Pipeline:
         logging.basicConfig(filename=filename, filemode='w',
                             format='%(name)s - %(levelname)s - %(message)s',
                             level=logging.INFO)
-        print(f'Logfile is at "{os.path.abspath(filename)}"')
+        self.logfile = os.path.abspath(filename)
