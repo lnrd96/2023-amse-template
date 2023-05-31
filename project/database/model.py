@@ -50,6 +50,6 @@ class Accident(Model):
     month = IntegerField()
     hour = IntegerField()
     weekday = IntegerField()
-        
+
     class Meta:
         database = DB
