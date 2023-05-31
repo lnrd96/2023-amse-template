@@ -53,11 +53,20 @@ class DatabaseHandler():
 
     def reset_database(self):
         if os.path.exists(DB.database):
-            os.remove(DB.database)
-            print('Deleted old database.')
+            input = 'Do you really want to delete "%s"? (y/n)' % DB.database
+            if input.upper == 'Y':
+                os.remove(DB.database)
+                print('Deleted old database.')
+            else:
+                print('Aborting.')
+                return
         else:
             print('Database not found. Creating new database.')
         self.initialize_database()
 
     def alter_scheme(self):
-        raise NotImplementedError()
+        input = 'Do you really want to alter the database scheme? Check the implementation first! (y/n).'
+        if input.upper() == 'Y':
+            self._update_database()
+        else:
+            print('Aborting.')
