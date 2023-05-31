@@ -23,6 +23,10 @@ erDiagram
         int road_state
         int severeness
         int lighting_conditions
+        int year
+        int month
+        int hour
+        int weekday
         string road_type_osm
         string road_type_parsed
     }
