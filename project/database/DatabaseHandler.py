@@ -1,6 +1,9 @@
 import os
 import subprocess
 from database.model import DB, Accident, Participants, Coordinate
+from playhouse.migrate import SqliteMigrator, migrate
+from peewee import IntegerField
+# from peewee import *
 
 
 class DatabaseHandler():
@@ -10,6 +13,19 @@ class DatabaseHandler():
 
     def __init__(self):
         pass
+
+    def _update_database(self):
+        """ Needed to update the database sheme during the project.
+        """
+        DB.connect()
+        migrator = SqliteMigrator(DB)
+        migrate(
+            migrator.add_column('Accident', 'year', IntegerField(null=True)),
+            migrator.add_column('Accident', 'month', IntegerField(null=True)),
+            migrator.add_column('Accident', 'hour', IntegerField(null=True)),
+            migrator.add_column('Accident', 'weekday', IntegerField(null=True))
+        )
+        DB.close()
 
     def initialize_database(self):
         """ Creates sqlite3 database instance, the file.

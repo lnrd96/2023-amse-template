@@ -33,18 +33,31 @@ class Pipeline:
         Returns:
             pd.dataFrame: The preprocessed data.
         """
+        df = df.copy()  # make a copy to not produce sideeffects
         return df
 
     def data_to_db(self, df: pd.DataFrame):
         """ Feeds the data present in the given dataframe into the database.
             Uses `get_road_type_from_coordinate` to add road type info to
             accidents.
+            If the pipeline is run several times, because e.g.
+            one run took very long and users want to continue later, then,
+            duplicates will be recognized and the OSM API will not be queried again
+            for items already present.
 
         Args:
             df (pd.DataFrame): The data scraped by `scrape_accident_data`.
                                Optionally preprocessed by `preprocess`.
         """
-        n_fails, n_success = 0, 0
+        logging.info(f'{len(df)} entries to add.')
+        # coordinate lookup table to speed up consecutive db feedings
+        coordinate_lookup_table = {}
+        # query present data for coordinate to roadtype translation
+        for item in Accident().select():
+            coordinate_lookup_table[item.location.wsg_long, item.location.wsg_lat] = \
+                (item.road_type_osm, item.road_type_parsed)
+        # loop over data
+        n_queried, n_fails, n_success = 0, 0, 0
         for frame in tqdm(df.itertuples(index=False)):
             frame = frame._asdict()
             participants, _ = \
@@ -59,14 +72,17 @@ class Pipeline:
                                          utm_y=Decimal(frame['LINREFY'].replace(',', '.')),
                                          wsg_long=Decimal(frame['XGCSWGS84'].replace(',', '.')),
                                          wsg_lat=Decimal(frame['YGCSWGS84'].replace(',', '.')))
-            try:
-                osm_type, parsed_type = self.get_road_type_from_coordinate(latitude=coordinate.wsg_lat,
-                                                                           longitude=coordinate.wsg_long)
-            except RoadTypeNotFount as e:
-                logging.info(e)
-                n_fails += 1
-                participants.delete_instance()
-                coordinate.delete_instance()
+            if (coordinate.wsg_long, coordinate.wsg_lat) in coordinate_lookup_table:
+                osm_type, parsed_type = coordinate_lookup_table[(coordinate.wsg_long, coordinate.wsg_lat)]
+            else:
+                try:
+                    n_queried += 1
+                    osm_type, parsed_type = self.get_road_type_from_coordinate(latitude=coordinate.wsg_lat,
+                                                                               longitude=coordinate.wsg_long)
+                except RoadTypeNotFount as e:
+                    logging.info(e)
+                    n_fails += 1
+                    break
 
             Accident.get_or_create(road_state=frame['STRZUSTAND'],
                                    severeness=frame['UKATEGORIE'] - 1,  # such that all $\in [0,2]$.
@@ -74,9 +90,13 @@ class Pipeline:
                                    road_type_osm=osm_type,
                                    road_type_parsed=parsed_type,
                                    involved=participants,
-                                   location=coordinate)
+                                   location=coordinate,
+                                   year=frame['UJAHR'], month=frame['UMONAT'],
+                                   hour=frame['UMONTH'], weekday=['UWOCHENTAG'])
             n_success += 1
-            if n_success % 500 == 0:
+            if n_queried % 100 == 0:
+                logging.info(f'Queried the OSM server {n_queried} times.')
+            if n_success % 100 == 0:
                 logging.info(f'Created {n_success} entries out of {len(df)}.')
 
         logging.info('_' * 50 + '\n' + f'Added {n_success} entries to the database. {n_fails} potential entries were'
@@ -107,9 +127,9 @@ class Pipeline:
         while True:
             try:
                 response = requests.get(url)
-                logging.info('Connection reset by peer. Retrying in 100 seconds.')
                 break
             except ConnectionError:
+                logging.info('Connection reset by peer. Retrying in 100 seconds.')
                 time.sleep(100)
         if response.status_code == 200:
             # get response as JSON
@@ -125,7 +145,7 @@ class Pipeline:
             except KeyError:
                 logging.info(f'Road name not available by OSM.')
                 return osm_road_type, 'undefined'
-                
+
             if re.match(r'^A\s*\d+$', road_name):
                 extracted_road_type = 'Highway'  # Autobahn
             elif re.match(r'^B\s*\d+$', road_name):

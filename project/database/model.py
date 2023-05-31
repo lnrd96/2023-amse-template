@@ -43,9 +43,13 @@ class Accident(Model):
     severeness = IntegerField()  # 0:=minor injuries, 1:= major injuries, 2:= deadly UKATEGORIE (TODO: transform encoding)
     lighting_conditions = IntegerField()  # 0:=daylight, 1:=dusk, 2:=dark
     road_type_osm = CharField()
-    toad_type_parsed = CharField()
+    road_type_parsed = CharField()
     involved = ForeignKeyField(Participants)
     location = ForeignKeyField(Coordinate)
-
+    year = IntegerField()
+    month = IntegerField()
+    hour = IntegerField()
+    weekday = IntegerField()
+        
     class Meta:
         database = DB
