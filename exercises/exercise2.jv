@@ -1,0 +1,124 @@
+
+//
+//  _______        _          _____ _                  
+// |__   __|      (_)        | ____| |                 
+//    | |_ __ __ _ _ _ __   | (___ | |_ ___  _ __  ___ 
+//    | | '__| _` | | '_ \   |___ || __| _ || '_ \| __|
+//    | | | | (_| | | | | |  ____) | || (_) | |_) \__ \
+//    |_|_|  |__,_|_|_| |_| |_____| |__|___|| .__||___|
+//                                          | |        
+//                                          |_|        
+//                   
+//    Thank you 4 traveling with Deutsche Bahn.
+//                   
+//                       ooOOOO
+//                      oo      _____
+//                     _I__n_n__||_|| ________
+//                   >(_________|_7_|-|______|~ ~ ~ ~ ~ ~ 
+//                    |o ()() ()() o   oo  oo
+
+
+pipeline TrainStops {
+
+    block TSExtractor oftype HttpExtractor {
+        url: "https://download-data.deutschebahn.com/static/datasets/haltestellen/D_Bahnhof_2020_alle.CSV";
+    }
+
+    pipe {
+        from: TSExtractor;
+        to: TSTextFileInterpreter;
+    } // File
+    
+    block TSTextFileInterpreter oftype TextFileInterpreter {  
+
+    } // TextFile
+    
+    pipe {
+        from: TSTextFileInterpreter;
+        to: TSCSVInterpreter;
+    }
+
+    block TSCSVInterpreter oftype CSVInterpreter {  
+        delimiter: ";";
+    } // Sheet
+    
+    pipe {
+        from: TSCSVInterpreter;
+        to: TSColumnDeleter;
+    }
+
+    block TSColumnDeleter oftype ColumnDeleter {
+        delete: [column J];  // "Status" corresponds to the column index J.
+    } // Sheet
+    
+    pipe {
+        from: TSColumnDeleter;
+        to: TSTableInterpreter;
+    }
+
+
+    block TSTableInterpreter oftype TableInterpreter {
+        header: true;
+        columns: [
+            "EVA_NR" oftype integer,
+            "IFOPT" oftype IFOPTType,
+            "DS100" oftype text,
+            "NAME" oftype text,
+            "Verkehr" oftype VerkehrType,
+            "Laenge" oftype decimal,
+            "Breite" oftype decimal,
+            "Betreiber_Name" oftype Coordinate,
+            "Betreiber_Nr" oftype Coordinate,
+        ];
+    } // Table
+    
+    pipe {
+        from: TSTableInterpreter;
+        to: TSLoader;
+    }
+
+    block TSLoader oftype SQLiteLoader {
+        table: "trainstops";
+        file: "trainstops.sqlite";
+    }
+
+}
+
+// Verkehr
+
+constraint VerkehrConstraintList oftype AllowlistConstraint {
+    allowlist: ["FV", "RV", "nur DPN"];  // list of valid values
+}
+
+valuetype VerkehrType oftype text {
+    constraints: [
+        VerkehrConstraintList,
+    ];
+}
+
+// Koordinaten
+
+constraint CoordinateRange oftype RangeConstraint {
+  lowerBound: -90;
+  upperBound: 90;      
+  lowerBoundInclusive: true;
+  upperBoundInclusive: true;
+}
+
+valuetype Coordinate oftype decimal {
+    constraints: [
+        CoordinateRange,
+    ];
+}
+
+// IFOPT
+
+constraint IFOPTMatch oftype RegexConstraint {
+  regex: /^[a-zA-Z]{2}:\d+:\d+(?::\d+)?$/;
+}
+
+valuetype IFOPTType oftype text {
+    constraints: [
+        IFOPTMatch,
+    ];
+}
