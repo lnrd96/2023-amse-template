@@ -60,15 +60,15 @@ pipeline TrainStops {
     block TSTableInterpreter oftype TableInterpreter {
         header: true;
         columns: [
-            "EVA_NR" oftype integer,
+            "EVA_NR" oftype GETZero,
             "IFOPT" oftype IFOPTType,
-            "DS100" oftype text,
-            "NAME" oftype text,
+            "DS100" oftype StringExists,
+            "NAME" oftype StringExists,
             "Verkehr" oftype VerkehrType,
             "Laenge" oftype Coordinate,
             "Breite" oftype Coordinate,
-            "Betreiber_Name" oftype text,
-            "Betreiber_Nr" oftype integer,
+            "Betreiber_Name" oftype StringExists,
+            "Betreiber_Nr" oftype GETZero,
         ];
     } // Table
     
@@ -120,5 +120,30 @@ constraint IFOPTMatch oftype RegexConstraint {
 valuetype IFOPTType oftype text {
     constraints: [
         IFOPTMatch,
+    ];
+}
+
+// Betreiber Nummer
+
+constraint BNummer oftype RangeConstraint {
+  lowerBound: 0;
+  lowerBoundInclusive: true;
+}
+
+valuetype GETZero oftype integer {  // workaround to remove empty cells
+    constraints: [
+        BNummer,
+    ];
+}
+
+// Betreiber Name
+
+constraint NoEmptyString oftype LengthConstraint {
+  minLength: 1;
+}
+
+valuetype StringExists oftype text { // workaround to remove empty cells
+    constraints: [
+        NoEmptyString,
     ];
 }
