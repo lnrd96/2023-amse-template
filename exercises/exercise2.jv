@@ -65,10 +65,10 @@ pipeline TrainStops {
             "DS100" oftype text,
             "NAME" oftype text,
             "Verkehr" oftype VerkehrType,
-            "Laenge" oftype decimal,
-            "Breite" oftype decimal,
-            "Betreiber_Name" oftype Coordinate,
-            "Betreiber_Nr" oftype Coordinate,
+            "Laenge" oftype Coordinate,
+            "Breite" oftype Coordinate,
+            "Betreiber_Name" oftype text,
+            "Betreiber_Nr" oftype integer,
         ];
     } // Table
     
