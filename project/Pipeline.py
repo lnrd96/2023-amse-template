@@ -9,6 +9,7 @@ import pandas as pd
 
 from database.model import Accident, Participants, Coordinate
 from utils.CustomExceptions import RoadTypeNotFound
+from threading import Thread, Lock
 from typing import Tuple
 from decimal import Decimal
 from tqdm import tqdm
@@ -35,6 +36,7 @@ class Pipeline:
             pd.dataFrame: The preprocessed data.
         """
         df = df.copy()  # make a copy to not produce sideeffects
+        df.dropna(inplace=True)
         return df
 
     def data_to_db(self, df: pd.DataFrame):
@@ -57,12 +59,30 @@ class Pipeline:
         for item in Accident().select():
             coordinate_lookup_table[item.location.wsg_long, item.location.wsg_lat] = \
                 (item.road_type_osm, item.road_type_parsed)
-        # loop over data
+
+        # prequery roadtypes in parallel to speed up api querying
+        # lock = Lock()
+        # for frame in tqdm(df.itertuples(index=False)):
+        #     frame = frame._asdict()
+        #     wsg_long = Decimal(frame['XGCSWGS84'].replace(',', '.'))
+        #     wsg_lat = Decimal(frame['YGCSWGS84'].replace(',', '.'))
+        #     if (wsg_long, wsg_lat) in coordinate_lookup_table:
+        #         continue
+        #     try:
+        #         osm_type, parsed_type = self.get_road_type_from_coordinate(latitude=coordinate.wsg_lat,
+        #                                                                    longitude=coordinate.wsg_long)
+        #     except RoadTypeNotFound as e:
+        #         logging.info(e)
+        #         continue
+        #     coordinate_lookup_table[wsg_long, wsg_lat] = osm_type, parsed_type
+
+        # # loop over data
         n_queried, n_fails, n_success = 0, 0, 0
         for frame in tqdm(df.itertuples(index=False)):
             frame = frame._asdict()
             participants, _ = \
-                Participants.get_or_create(predestrian=bool(frame['IstFuss']),
+                Participants.get_or_create(car=bool(frame['IstPKW']),
+                                           predestrian=bool(frame['IstFuss']),
                                            truck=bool(frame['IstGkfz']),
                                            motorcycle=bool(frame['IstKrad']),
                                            bike=bool(frame['IstRad']),
@@ -243,10 +263,11 @@ class Pipeline:
         # concatenate all the data frames into a single data frame
         combined_df = pd.concat(data_frames)
         combined_df.to_csv('unfallorte_all.csv', index=False)
-        return combined_df
 
         # remove artifacts
         shutil.rmtree(target_directory, ignore_errors=True)
+
+        return combined_df
 
     def _setup_logging(self):
         f_id = datetime.now().strftime("%m.%d.%Y_%H:%M:%S")

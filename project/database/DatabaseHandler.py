@@ -2,7 +2,7 @@ import os
 import subprocess
 from database.model import DB, Accident, Participants, Coordinate
 from playhouse.migrate import SqliteMigrator, migrate
-from peewee import IntegerField
+from peewee import IntegerField, BooleanField
 # from peewee import *
 
 
@@ -20,10 +20,7 @@ class DatabaseHandler():
         DB.connect()
         migrator = SqliteMigrator(DB)
         migrate(
-            migrator.add_column('Accident', 'year', IntegerField(null=True)),
-            migrator.add_column('Accident', 'month', IntegerField(null=True)),
-            migrator.add_column('Accident', 'hour', IntegerField(null=True)),
-            migrator.add_column('Accident', 'weekday', IntegerField(null=True))
+            migrator.add_column('Participants', 'car', BooleanField(null=True))
         )
         DB.close()
 
@@ -53,8 +50,8 @@ class DatabaseHandler():
 
     def reset_database(self):
         if os.path.exists(DB.database):
-            input = 'Do you really want to delete "%s"? (y/n)' % DB.database
-            if input.upper == 'Y':
+            answer = input('Do you really want to delete "%s"? (y/n)' % DB.database)
+            if answer.upper == 'Y':
                 os.remove(DB.database)
                 print('Deleted old database.')
             else:
@@ -65,8 +62,8 @@ class DatabaseHandler():
         self.initialize_database()
 
     def alter_scheme(self):
-        input = 'Do you really want to alter the database scheme? Check the implementation first! (y/n).'
-        if input.upper() == 'Y':
+        answer = input('Do you really want to alter the database scheme? Check the implementation first! (y/n).\n')
+        if answer.upper() == 'Y':
             self._update_database()
         else:
             print('Aborting.')

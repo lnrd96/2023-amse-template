@@ -7,6 +7,7 @@ DB = SqliteDatabase(os.path.join(PROJECT_ROOT, 'database', 'data.sqlite'))
 
 class Participants(Model):
     """ Type of participants involved into the accident. """
+    car = BooleanField()
     predestrian = BooleanField()
     truck = BooleanField()  # Gkfz
     motorcycle = BooleanField()  # Krad
