@@ -22,10 +22,9 @@ jobs:
       with:
         python-version: 3.11.3
     - name: Install dependencies
-      run: | 
-        echo "Current Working Directory: $(ls main)" && pip install -r project/requirements.txt && pip install flake8
+      run: pip install -r main/project/requirements.txt && pip install flake8
     - name: Run Flake8 ❄️
-      run: flake8 --exclude=venv,__pycache__ --ignore=F405,E501,F401,E241 project
+      run: flake8 --exclude=venv,__pycache__ --ignore=F405,E501,F401,E241 main/project
     
   test:
     name: Test Code Behaviour
@@ -41,4 +40,4 @@ jobs:
       with:
         python-version: 3.11.3
     - name: Run the tests
-      run: project/tests.sh
+      run: main/project/tests.sh
