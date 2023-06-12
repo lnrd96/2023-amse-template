@@ -42,4 +42,4 @@ jobs:
     - name: Install dependencies
       run: pip install -r main/project/requirements_ci.txt
     - name: Run the tests
-      run: cd main && project/tests.sh
+      run: cd main/project && tests.sh
