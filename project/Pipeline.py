@@ -36,7 +36,7 @@ class Pipeline:
             pd.dataFrame: The preprocessed data.
         """
         df = df.copy()  # make a copy to not produce sideeffects
-        df.dropna(inplace=True)
+        df.dropna(inplace=True, subset=['ULICHTVERH'])
         return df
 
     def data_to_db(self, df: pd.DataFrame):
@@ -56,7 +56,7 @@ class Pipeline:
         # coordinate lookup table to speed up consecutive db feedings
         coordinate_lookup_table = {}
         # query present data for coordinate to roadtype translation
-        for item in Accident().select():
+        for item in tqdm(Accident().select()):
             coordinate_lookup_table[item.location.wsg_long, item.location.wsg_lat] = \
                 (item.road_type_osm, item.road_type_parsed)
 
@@ -106,7 +106,6 @@ class Pipeline:
                     logging.info(e)
                     n_fails += 1
                     continue
-
 
             Accident.get_or_create(road_state=frame['STRZUSTAND'],
                                    severeness=frame['UKATEGORIE'] - 1,  # such that all $\in [0,2]$.
@@ -168,7 +167,7 @@ class Pipeline:
             try:
                 road_name = data['address']['road']
             except KeyError:
-                logging.info(f'Road name not available by OSM.')
+                logging.info('Road name not available by OSM.')
                 return osm_road_type, 'undefined'
 
             if re.match(r'^A\s*\d+$', road_name):
