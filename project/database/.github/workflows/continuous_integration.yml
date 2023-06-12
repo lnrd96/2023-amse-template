@@ -22,7 +22,8 @@ jobs:
       with:
         python-version: 3.11.3
     - name: Install dependencies
-      run: pwd && pip install -r project/requirements.txt && pip install flake8
+      run: | 
+        echo "Current Working Directory: $(pwd)" && pip install -r project/requirements.txt && pip install flake8
     - name: Run Flake8 ❄️
       run: flake8 --exclude=venv,__pycache__ --ignore=F405,E501,F401,E241 project
     
