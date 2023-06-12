@@ -40,4 +40,4 @@ jobs:
       with:
         python-version: 3.11.3
     - name: Run the tests
-      run: main/project/tests.sh
+      run: cd main && project/tests.sh
