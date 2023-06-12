@@ -18,10 +18,7 @@ executing==1.2.0
 fastjsonschema==2.16.3
 Fiona==1.9.4.post1
 fonttools==4.39.4
-geographiclib==2.0
 geopandas==0.13.2
-geoplot==0.5.1
-geopy==2.3.0
 greenlet==2.0.2
 idna==3.4
 ipykernel==6.22.0
