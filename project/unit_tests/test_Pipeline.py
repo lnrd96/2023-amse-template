@@ -2,6 +2,7 @@ import os
 import numpy as np
 import pandas as pd
 import unittest
+from database.DatabaseHandler import DatabaseHandler
 from database.model import Accident
 from Pipeline import Pipeline
 from utils.CustomExceptions import RoadTypeNotFound
@@ -19,6 +20,7 @@ class TestPipeline(unittest.TestCase):
     def setUpClass(cls):
         """ Executed once before all tests. """
         cls.pipeline = Pipeline()
+        DatabaseHandler.initialize_database()
 
     @classmethod
     def tearDownClass(cls):
