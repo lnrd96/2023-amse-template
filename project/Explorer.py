@@ -15,7 +15,7 @@ class Explorer():
     def __init__(self):
         pass
 
-    def plot_accident_location(self, target_file_name:str = None, n_accidents:int = 5000):
+    def plot_accident_location(self, target_file_name: str = None, n_accidents: int = 5000):
         """ Plots accidents on a map of germany.
 
         Args:
@@ -56,18 +56,19 @@ class Explorer():
             return (Accident
                     .select()
                     .join(Participants, on=(Accident.involved == Participants.id))
-                    .where(participant == True & l_ps[0] == False &
-                           l_ps[1] == False & l_ps[2] == False &
-                           l_ps[3] == False & l_ps[4] == False)
+                    .where(participant == True & l_ps[0] == False &  # noqa: E712, W504
+                           l_ps[1] == False & l_ps[2] == False &  # noqa: E712, W504
+                           l_ps[3] == False & l_ps[4] == False)  # noqa: E712
                     .count()
                     )
+
         def get_joint_count(p1, p2):
             result = (Accident
-                    .select()
-                    .join(Participants, on=(Accident.involved == Participants.id))
-                    .where((p1 == True) & (p2 == True))
-                    .count()
-                    )
+                      .select()
+                      .join(Participants, on=(Accident.involved == Participants.id))
+                      .where((p1 == True) & (p2 == True))  # noqa: E712
+                      .count()
+                      )
             return result
         # number of accidents where predestrians are involved
         # c = Accident.select().where(Accident.involved.predestrian == True).count()
@@ -120,8 +121,8 @@ class Explorer():
         plt.yticks(np.arange(6) + 0.5, labels, rotation=0)
         plt.savefig('jp.png')
 
-    def plot_accidents_by_street_type(self, target_file_name:str = None):
-        """ Plotting histograms frequency for respective road types. """        
+    def plot_accidents_by_street_type(self, target_file_name: str = None):
+        """ Plotting histograms frequency for respective road types. """
 
         # get data
         all_types_parsed = Accident.select(Accident.road_type_parsed).distinct()
@@ -155,7 +156,7 @@ class Explorer():
             plt.savefig(target_file_name)
 
     def plot_accidents_by_weekday(self, target_file_name: str = None):
-        """ Plotting histograms frequency for respective week days. """        
+        """ Plotting histograms frequency for respective week days. """
 
         all_days = Accident.select(Accident.weekday).distinct()
         all_days = [item.weekday for item in all_days]
