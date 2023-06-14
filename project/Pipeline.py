@@ -39,7 +39,7 @@ class Pipeline:
         df.dropna(inplace=True, subset=['ULICHTVERH'])
         return df
 
-    def data_to_db(self, df: pd.DataFrame):
+    def data_to_db(self, df: pd.DataFrame, lookup: bool = True):
         """ Feeds the data present in the given dataframe into the database.
             Uses `get_road_type_from_coordinate` to add road type info to
             accidents.
@@ -51,30 +51,17 @@ class Pipeline:
         Args:
             df (pd.DataFrame): The data scraped by `scrape_accident_data`.
                                Optionally preprocessed by `preprocess`.
+            lookup (bool): Whether to precache present OSM data.
+                           Needed if database if filled by consecutive calls.
         """
         logging.info(f'{len(df)} entries to add.')
         # coordinate lookup table to speed up consecutive db feedings
         coordinate_lookup_table = {}
         # query present data for coordinate to roadtype translation
-        for item in tqdm(Accident().select()):
-            coordinate_lookup_table[item.location.wsg_long, item.location.wsg_lat] = \
-                (item.road_type_osm, item.road_type_parsed)
-
-        # prequery roadtypes in parallel to speed up api querying
-        # lock = Lock()
-        # for frame in tqdm(df.itertuples(index=False)):
-        #     frame = frame._asdict()
-        #     wsg_long = Decimal(frame['XGCSWGS84'].replace(',', '.'))
-        #     wsg_lat = Decimal(frame['YGCSWGS84'].replace(',', '.'))
-        #     if (wsg_long, wsg_lat) in coordinate_lookup_table:
-        #         continue
-        #     try:
-        #         osm_type, parsed_type = self.get_road_type_from_coordinate(latitude=coordinate.wsg_lat,
-        #                                                                    longitude=coordinate.wsg_long)
-        #     except RoadTypeNotFound as e:
-        #         logging.info(e)
-        #         continue
-        #     coordinate_lookup_table[wsg_long, wsg_lat] = osm_type, parsed_type
+        if lookup:
+            for item in tqdm(Accident().select()):
+                coordinate_lookup_table[item.location.wsg_long, item.location.wsg_lat] = \
+                    (item.road_type_osm, item.road_type_parsed)
 
         # # loop over data
         n_queried, n_fails, n_success = 0, 0, 0
@@ -252,7 +239,8 @@ class Pipeline:
         # read data content into pandas dataframe
         files = os.listdir(target_directory)
         data_files = [file for file in files
-                      if re.match(r'^Unfallorte\d{4}_LinRef\.(?:csv|txt)$', file)]
+                      if re.match(r'^Unfallorte_?\d{4}_LinRef\.(?:csv|txt)$', file)]
+        data_files.append('Unfallorte2021_EPSG25832_CSV.csv')
         data_frames = []
         for csv_file in data_files:
             csv_path = os.path.join(target_directory, csv_file)

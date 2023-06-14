@@ -7,7 +7,7 @@ from database.model import Accident
 from Pipeline import Pipeline
 from utils.CustomExceptions import RoadTypeNotFound
 
-N_ACCIDENTS = 1146669
+N_ACCIDENTS = 1_298_342
 TEST_RESSOURCE = os.path.join('unit_tests', 'test_ressource.csv')
 
 
@@ -20,7 +20,7 @@ class TestPipeline(unittest.TestCase):
     def setUpClass(cls):
         """ Executed once before all tests. """
         cls.pipeline = Pipeline()
-        DatabaseHandler.initialize_database()
+        DatabaseHandler().initialize_database()
 
     @classmethod
     def tearDownClass(cls):
@@ -30,7 +30,7 @@ class TestPipeline(unittest.TestCase):
     def testSideeffects(self):
         """ Test that preprocessing does not change the data it is given,
             but works with a copy of it. """
-        df_orig = pd.DataFrame(data=np.empty((0, 0)))
+        df_orig = pd.read_csv(TEST_RESSOURCE)
         self.assertIsNot(df_orig, self.pipeline.preprocess(df_orig))
 
     def testLogfileExists(self):
@@ -52,7 +52,7 @@ class TestPipeline(unittest.TestCase):
         # count db entries
         pre_count = Accident.select().count()
         # add data to db
-        self.pipeline.data_to_db(data)
+        self.pipeline.data_to_db(data, lookup=False)
         # count db entries
         post_count = Accident.select().count()
         # leave db in clean state

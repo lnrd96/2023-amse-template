@@ -44,7 +44,7 @@ class DatabaseHandler():
             DB.create_tables([Accident, Participants, Coordinate], safe=True)
             DB.close()
         except Exception as e:
-            print(f'Error creating database scheme with peeweee: {e.stderror}')
+            print(f'Error creating database scheme with peeweee: \n{e}')
             return
         print(f'Succesfully generated database: "{DB.database}".')
 
