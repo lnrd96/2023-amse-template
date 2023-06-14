@@ -258,6 +258,7 @@ class Pipeline:
 
     def _setup_logging(self):
         f_id = datetime.now().strftime("%m.%d.%Y_%H:%M:%S")
+        os.makedirs('logfiles', exist_ok=True)
         filename = os.path.join('logfiles', f_id + '.log')
         logging.basicConfig(filename=filename, filemode='w',
                             format='%(name)s - %(levelname)s - %(message)s',

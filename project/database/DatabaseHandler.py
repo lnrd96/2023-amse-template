@@ -28,8 +28,8 @@ class DatabaseHandler():
         """ Creates sqlite3 database instance, the file.
             Initializes the database scheme using peewee.
         """
-        print('Initializing database...')
         if not os.path.isfile(DB.database):
+            print('Initializing database...')
             sqlite3 = subprocess.Popen(['sqlite3', DB.database], stdin=subprocess.PIPE)
             stdout, stderr = sqlite3.communicate(input=b';\n.schema\n.quit')
         else:
