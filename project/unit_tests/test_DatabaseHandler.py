@@ -9,7 +9,6 @@ class TestDatabaseHandler(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """ Executed once before all tests. """
-        print(DB.database)
         cls.handler = DatabaseHandler()
         cls.handler.initialize_database()
 
