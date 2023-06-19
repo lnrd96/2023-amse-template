@@ -17,7 +17,7 @@ def automated_data_pipeline():
 
     # assign column names
     column_names = ['date', 'CIN', 'name', 'petrol', 'diesel', 'gas', 'electro', 'hybrid', 'plugInHybrid', 'others']
-    data_types = ['TEXT', 'TEXT', 'TEXT', 'INTEGER' * 7]
+    data_types = ['TEXT', 'TEXT', 'TEXT'] + ['INTEGER'] * 7
     df = df.rename(columns=dict(zip(df.columns, column_names)))
 
     # validate data
