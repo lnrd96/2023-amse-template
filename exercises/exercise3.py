@@ -17,11 +17,22 @@ def automated_data_pipeline():
 
     # assign column names
     column_names = ['date', 'CIN', 'name', 'petrol', 'diesel', 'gas', 'electro', 'hybrid', 'plugInHybrid', 'others']
-    data_types = ['']  # TODO
+    data_types = ['TEXT', 'INTEGER', 'TEXT', 'INTEGER' * 7]
     df = df.rename(columns=dict(zip(df.columns, column_names)))
 
     # validate data
+    df = df.dropna()
+    df = df[~(df == '-').any(axis=1)]
+
     regex_cin = r'0?[0-9]{4}'  # zero can be there four digits must be there
+    df['CIN'] = df['CIN'].astype(str)
+    valid_cin = df['CIN'].str.match(regex_cin)
+    df = df[valid_cin]
+
+    exclude_columns = ['date', 'CIN', 'name']
+    columns_to_check = df.drop(columns=exclude_columns).astype(int)
+    valid_others = (columns_to_check > 0).all(axis=1)
+    df = df[valid_others]
 
     # persist data
     column_types = dict(zip(column_names, data_types))
