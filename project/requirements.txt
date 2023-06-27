@@ -81,3 +81,4 @@ tzdata==2023.3
 urllib3==2.0.2
 wcwidth==0.2.6
 xyzservices==2023.5.0
+yellowbrick==1.5
