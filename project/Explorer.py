@@ -3,12 +3,13 @@ import numpy as np
 import seaborn as sns
 import geopandas as gpd
 import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
 import peewee
-import datetime
-import calendar
+import os
 
-from database.model import Accident, Participants, Coordinate
-from calendar import monthrange
+from database.model import Accident, Participants
+from typing import Tuple
+from tqdm import tqdm
 from peewee import fn
 
 
@@ -36,7 +37,6 @@ class Explorer():
         germany.plot(ax=ax, color='white', edgecolor='black')
 
         # plot coordinates
-
         for accident in Accident.select().order_by(fn.Random()).limit(n_accidents):
             longitude = accident.location.wsg_long
             latitude = accident.location.wsg_lat
@@ -46,13 +46,13 @@ class Explorer():
 
         ax.set_title('Map of Accidents')
         ax.axis('off')
-        plt.figure(figsize=(8, 6))  # adjust for the size of figure
+        plt.figure(figsize=(16, 12))
         if target_file_name is None:
             plt.show()
         else:
             plt.savefig(target_file_name)
 
-    def _plot_query_on_map(self, query: peewee.ModelSelect):
+    def _plot_query_on_map(self, query: peewee.ModelSelect, title='Map of Accidents'):
         """ Plots accidents present in query on a map of germany.
         """
 
@@ -64,16 +64,58 @@ class Explorer():
 
         # plot coordinates
 
-        for accident in query:
+        for accident in tqdm(query):
             longitude = accident.location.wsg_long
             latitude = accident.location.wsg_lat
 
             # TODO: distinguish between road types
             ax.plot(longitude, latitude, 'ro', markersize=1)  # 'ro' means red color, circle marker
 
-        ax.set_title('Map of Accidents')
+        ax.set_title(title)
         ax.axis('off')
-        plt.figure(figsize=(8, 6))  # adjust for the size of figure
+        plt.figure(figsize=(16, 12))  # adjust for the size of figure
+        plt.show()
+
+    def _plot_two_queries_on_map(self, query_a: peewee.ModelSelect, query_b: peewee.ModelSelect, titles: Tuple[str, str]):
+        """ Plots accidents present in the queries on different maps of germany, next to each other.
+            Also adds a reference map with cities and highways on it.
+        """
+        if 'project' not in os.getcwd():
+            os.chdir(os.path.join('2023-amse-template', 'project'))
+
+        # plot germany
+        world = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres'))
+        germany = world[world['name'] == 'Germany']
+        fig, axes = plt.subplots(1, 3)
+        germany.plot(ax=axes[0], color='white', edgecolor='black')
+        germany.plot(ax=axes[1], color='white', edgecolor='black')
+
+        map_image = mpimg.imread('database/germany.jpg')
+        axes[2].imshow(map_image, extent=[0, map_image.shape[1], 0, map_image.shape[0]])
+        axes[2].axis('off')
+        axes[2].set_title('Reference Map')
+
+        # plot coordinates
+
+        for accident in tqdm(query_a):
+            longitude = accident.location.wsg_long
+            latitude = accident.location.wsg_lat
+
+            axes[0].plot(longitude, latitude, 'ro', markersize=1)  # 'ro' means red color, circle marker
+
+        axes[0].set_title(titles[0])
+        axes[0].axis('off')
+
+        for accident in tqdm(query_b):
+            longitude = accident.location.wsg_long
+            latitude = accident.location.wsg_lat
+
+            axes[1].plot(longitude, latitude, 'ro', markersize=1)  # 'ro' means red color, circle marker
+
+        axes[1].set_title(titles[1])
+        axes[1].axis('off')
+
+        plt.figure(figsize=(16, 12))  # adjust for the size of figure
         plt.show()
 
     def plot_percentage_of_injury_types(self):
@@ -94,10 +136,11 @@ class Explorer():
         plt.pie(data, labels=labels, colors=colors, autopct='%.0f%%')
         plt.show()
 
-    def plot_death_probabilities_by_participant(self, target_file_name:str = None):
+    def plot_death_probabilities_by_participant(self, target_file_name: str = None):
+        """ Bar plot showing the death frequency by involved participants. """
         histo = {}
         for participant in self.participants_list:
-            prob = self.get_death_probability_given_participant_type(participant)
+            prob = self._get_death_probability_given_participant_type(participant)
             name = str(participant).replace('BooleanField: Participants.', '')[1:-1].capitalize()
             histo[name] = prob
         df = pd.DataFrame(list(histo.items()), columns=['Category', 'Frequency'])
@@ -108,11 +151,12 @@ class Explorer():
         else:
             plt.savefig(target_file_name)
 
-    def plot_death_probabilities_by_street_type(self, target_file_name:str = None):
+    def plot_death_probabilities_by_street_type(self, target_file_name: str = None):
+        """ Bar plot showing the death probability by selected OSM street types. """
         street_types_osm = ['motorway', 'tertiary', 'secondary', 'primary', 'trunk', 'service', 'living_street', 'living_street']
         histo = {}
         for street in street_types_osm:
-            prob = self.get_death_probability_given_street_type(street)
+            prob = self._get_death_probability_given_street_type(street)
             histo[street.capitalize()] = prob
         df = pd.DataFrame(list(histo.items()), columns=['Category', 'Frequency'])
         plt.figure(figsize=(8, 6))
@@ -122,7 +166,7 @@ class Explorer():
         else:
             plt.savefig(target_file_name)
 
-    def get_death_probability_given_street_type(self, street_type: str):
+    def _get_death_probability_given_street_type(self, street_type: str):
         """ Assuming that an accident happens: what is the probability that at least one participant dies,
             given a road type. """
         num_all = Accident.select().where(Accident.road_type_osm == street_type).count()  # noqa: E712
@@ -131,13 +175,13 @@ class Explorer():
         assert probability <= 1.0 and probability >= 0.0
         return probability * 100
 
-    def get_death_probability_given_participant_type(self, participant_type: peewee.FieldAccessor):
+    def _get_death_probability_given_participant_type(self, participant_type: peewee.FieldAccessor):
         """ Assuming that an accident happens: what is the probability that at least one participant dies """
         # (accidents involing participant and deadly injuries) / (all accidents involving participant type)
         num_all = Accident.select().join(Participants, on=(Accident.involved == Participants.id)) \
                                    .where(participant_type == True).count()  # noqa: E712
         num_deadly = Accident.select().join(Participants, on=(Accident.involved == Participants.id)) \
-                                     .where((participant_type == True) & (Accident.severeness == 0)).count()   # noqa: E712
+                                      .where((participant_type == True) & (Accident.severeness == 0)).count()   # noqa: E712
         probability = num_deadly / num_all
         assert probability <= 1.0 and probability >= 0.0
         return probability * 100
@@ -145,7 +189,7 @@ class Explorer():
     def plot_avg_lighting_conditions_over_time(self):
         # do more accidents happen during night on Landstrassen (primary roads)? did it change over time?
         # loop over accidents by time
-        years = range(2016, 2023)
+        years = range(2018, 2020)
         light_over_months = {}
         for y in years:
             months = range(1, 13)
@@ -178,13 +222,24 @@ class Explorer():
         plt.tight_layout()
         plt.show()
 
+    def plot_car_severe_and_deadly_accidents_on_highways_and_on_secondary_roads_in_the_dark(self):
+        """ Map plot of severe and deadly car accidents in the dark. Respective maps for highway and secondary road. """
+        only_cars = Participants.select().where((Participants.car == True) &  # noqa: E712
+                                                (Participants.predestrian == False) &  # noqa: E712
+                                                (Participants.bike == False) &  # noqa: E712
+                                                (Participants.truck == False) &  # noqa: E712
+                                                (Participants.other == False) &  # noqa: E712
+                                                (Participants.motorcycle == False))  # noqa: E712
+        query_a = Accident.select().where((Accident.road_type_osm == 'secondary')
+                                          & (Accident.severeness < 2) & (Accident.lighting_conditions == 2)
+                                          & (Accident.involved == only_cars[0].id))
+        query_b = Accident.select().where((Accident.road_type_osm == 'motorway')
+                                          & (Accident.severeness < 2) & (Accident.lighting_conditions == 2)
+                                          & (Accident.involved == only_cars[0].id))
+        self._plot_two_queries_on_map(query_a, query_b, ['Secondary Roads', 'Motorways'])
 
-    def plot_accidents_on_primary_loads_with_bad_lighting_conditions(self):
-        pass
-        # TODO: plot them make and make clusters
-
-    def get_number_of_accidents_involving_more_than_two_different_parties(self):
-        # number expect to be so low such that it can be ignored
+    def _get_number_of_accidents_involving_more_than_two_different_parties(self):
+        """ An sql query for the number of accidents where more than two different types of participants was involved. """
         return (Accident
                 .select()
                 .join(Participants, on=(Accident.involved == Participants.id))
@@ -200,12 +255,13 @@ class Explorer():
                 ).count()
 
     def plot_accidents_by_participants(self):
-        """ Heatmap showing the frequency of pairs of participants
-            involved in accidents.
-        """
+        """ Heatmap showing the frequency of pairs of participants involved in accidents.
+            It reflects how frequent accidents with different combinations of participants are.
+            Accidents where more than two different types of participants are involved are not conducted. """
+
         def get_exclusive_count(p1, p2):
-            # accidents where exclusively the given participants are involved and no others
-            # e.g. accident between car and car
+            """ Helper: accidents where exclusively the given participants are involved and no others
+                        e.g. accident between car and car """
 
             l_ps = self.participants_list.copy()
             l_ps = [x for x in l_ps if x.column_name != p1.column_name]
@@ -240,16 +296,6 @@ class Explorer():
                      )
                 return r
 
-        def get_joint_count(p1, p2):
-            # accidents where at least the given participants are involved but also others may be involved
-            result = (Accident
-                      .select()
-                      .join(Participants, on=(Accident.involved == Participants.id))
-                      .where((p1 == True) & (p2 == True))  # noqa: E712
-                      .count()
-                      )
-            return result
-        # number of accidents where predestrians are involved
         participants_list = [Participants.predestrian, Participants.truck,
                              Participants.motorcycle, Participants.bike,
                              Participants.car, Participants.other]
@@ -292,8 +338,11 @@ class Explorer():
                             get_exclusive_count(participants_list[5], participants_list[5])],
         }
         df = pd.DataFrame(data)
-        plt.figure(figsize=(8, 6))  # adjust for the size of figure
-        sns.heatmap(df, annot=True, cmap='coolwarm', fmt='d', vmax=200000, vmin=700)
+        plt.figure(figsize=(8, 6))
+        # mask for the upper triangle, to remove redundancy resulting out of symmetry
+        mask = np.triu(np.ones_like(df, dtype=bool))
+        mask[np.diag_indices(mask.shape[0])] = 0  # diagonal should not be removed
+        sns.heatmap(df, annot=True, mask=mask, cmap='coolwarm', fmt='d', vmax=200000, vmin=700)
         labels = ['Predestrian', 'Truck', 'Motorcycle', 'Bike', 'Car', 'Other']
         plt.xticks(np.arange(6) + 0.5, labels)
         plt.yticks(np.arange(6) + 0.5, labels, rotation=0)
