@@ -41,7 +41,7 @@ class Accident(Model):
         and holding some metadata specific to the accident.
     """
     road_state = IntegerField()  # 0:=dry, 1:=wet, 2:=frozen
-    severeness = IntegerField()  # 0:=minor injuries, 1:= major injuries, 2:= deadly UKATEGORIE
+    severeness = IntegerField()  # 0:=deadly, 1:= major injuries, 2:= minor injuries UKATEGORIE
     lighting_conditions = IntegerField()  # 0:=daylight, 1:=dusk, 2:=dark
     road_type_osm = CharField()
     road_type_parsed = CharField()
