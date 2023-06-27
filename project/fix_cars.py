@@ -1,4 +1,5 @@
 from tqdm import tqdm
+from database.model import DB
 import pandas as pd
 from decimal import Decimal
 from database.model import Accident, Coordinate, Participants
@@ -9,7 +10,7 @@ from database.model import Accident, Coordinate, Participants
 
 df = pd.read_csv('/Users/leonardfischer/Uni/sem_2/de/2023-amse-template/project/unfallorte_all.csv')
 num_not_found = 0
-print(Participants.delete().execute())
+# print(Participants.delete().execute())
 
 for frame in tqdm(df.itertuples(index=False)):
     frame = frame._asdict()
@@ -27,7 +28,7 @@ for frame in tqdm(df.itertuples(index=False)):
                                     Accident.location == coordinate)
     if accident is not None:
         # make new participant entry
-        participants = \
+        participants, _ = \
             Participants.get_or_create(car=bool(frame['IstPKW']),
                                        predestrian=bool(frame['IstFuss']),
                                        truck=bool(frame['IstGkfz']),
@@ -35,12 +36,14 @@ for frame in tqdm(df.itertuples(index=False)):
                                        bike=bool(frame['IstRad']),
                                        other=bool(frame['IstSonstig']))
         # update
+        participants.save()
         accident.involved = participants
+        accident.save()
     else:
         num_not_found += 1
         print(f'Accident not found. ({num_not_found})')
 
-query = Participants.delete().where(Participants.car.is_null())
-deleted_count = query.execute()
-print(f'Deleted {deleted_count} deprecated "Participants" entries.')
+# query = Participants.delete().where(Participants.car.is_null())
+# deleted_count = query.execute()
+# print(f'Deleted {deleted_count} deprecated "Participants" entries.')
 print(f'Updated {len(df)-num_not_found} Accident entries.')
