@@ -3,6 +3,7 @@ import seaborn as sns
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import peewee
+import pandas as pd
 from sklearn.cluster import KMeans
 from yellowbrick.cluster import KElbowVisualizer
 from typing import Tuple
@@ -28,6 +29,35 @@ class Analyzer():
         visualizer.fit(X)
         visualizer.show()
 
+    def get_k_means_from_query_better_map(self, n_centers: int, query: peewee.ModelSelect):
+        X = np.array([(c.wsg_long, c.wsg_lat) for c in query])
+        kmeans = KMeans(n_clusters=n_centers)
+        kmeans.fit(X)
+        labels = kmeans.labels_
+        centers = kmeans.cluster_centers_
+        
+        import plotly.io as pio
+        import plotly.express as px
+
+        pio.renderers.default = "notebook"
+        df = pd.DataFrame.from_records(list(query.dicts()))
+        df['labels'] = labels
+        fig = px.scatter_mapbox(df,
+                                lat="wsg_lat",
+                                lon="wsg_long",
+                                # hover_name="",
+                                # hover_data=[],
+                                color="labels",
+                                zoom=5,
+                                height=800,
+                                width=1200)
+        fig.update_layout(mapbox_style="open-street-map")
+        fig.update_layout(margin={})
+        fig.show()
+        return
+        
+        
+    
     def get_k_means_from_query(self, n_centers: int, query: peewee.ModelSelect, title='', markersize=1, ext_ax=None):
         """ Calculates clusters using k-means algorithm and plots them on a map.
 
