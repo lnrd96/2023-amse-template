@@ -7,7 +7,7 @@ import matplotlib.image as mpimg
 import peewee
 import os
 
-from database.model import Accident, Participants
+from database.model import Accident, Participants, Coordinate
 from typing import Tuple
 from tqdm import tqdm
 from peewee import fn
@@ -30,6 +30,10 @@ class Explorer():
             n_accidents (int, optional): Number of accidents to plot. Random draws. Defaults to 5000.
         """
 
+        query = Accident.select(Coordinate.wsg_long, Coordinate.wsg_lat, Accident.hour, Accident.road_type_osm, Accident.lighting_conditions, Accident.road_state).join(Coordinate).order_by(fn.Random()).limit(n_accidents) #, on=(Accident.location==Coordinate.id))
+        # query = Accident.select().order_by(fn.Random()).limit(n_accidents).join(Coordinate) #, on=(Accident.location==Coordinate.id))
+        self._plot_query_on_map(query)
+        return
         # plot germany
         world = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres'))
         germany = world[world['name'] == 'Germany']
@@ -55,6 +59,25 @@ class Explorer():
     def _plot_query_on_map(self, query: peewee.ModelSelect, title='Map of Accidents'):
         """ Plots accidents present in query on a map of germany.
         """
+        import plotly.io as pio
+        import plotly.express as px
+
+        pio.renderers.default = "notebook"
+        df = pd.DataFrame.from_records(list(query.dicts()))
+        fig = px.scatter_mapbox(df,
+                                lat="wsg_lat",
+                                lon="wsg_long",
+                                hover_name="road_type_osm",
+                                hover_data=["road_state", "lighting_conditions", "hour"],
+                                color="road_type_osm",
+                                zoom=5,
+                                height=800,
+                                width=1200)
+        fig.update_layout(mapbox_style="open-street-map")
+        fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
+        fig.show()
+        return
+
 
         # plot germany
         world = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres'))
@@ -133,7 +156,8 @@ class Explorer():
         # define Seaborn color palette to use
         colors = sns.color_palette('pastel')[0:3]
         # create pie chart
-        plt.pie(data, labels=labels, colors=colors, autopct='%.0f%%')
+        explode = (0, 0, 0.1) 
+        plt.pie(data, labels=labels, colors=colors, autopct='%.0f%%', explode=explode)
         plt.show()
 
     def plot_death_probabilities_by_participant(self, target_file_name: str = None):
@@ -364,17 +388,16 @@ class Explorer():
             histo_dict_osm[road] = Accident.select().where(Accident.road_type_osm == road).count()
 
         # make histograms
-        df_parsed = pd.DataFrame(list(histo_dict_parsed.items()), columns=['Category', 'Frequency'])
+        # df_parsed = pd.DataFrame(list(histo_dict_parsed.items()), columns=['Category', 'Frequency'])
         df_osm = pd.DataFrame(list(histo_dict_osm.items()), columns=['Category', 'Frequency'])
 
-        fig, axes = plt.subplots(nrows=2, ncols=1, figsize=(8, 10))
+        fig, axes = plt.subplots(nrows=1, ncols=1)
 
-        sns.barplot(x='Category', y='Frequency', data=df_parsed, palette='viridis', ax=axes[0])
-        axes[0].set_title('Road type parsed out of street name')
-        sns.barplot(x='Category', y='Frequency', data=df_osm, palette='viridis', ax=axes[1])
-        axes[1].set_title('Road type by Open Street Map (OSM)')
-        plt.setp(axes[0].xaxis.get_majorticklabels(), rotation=12)
-        plt.setp(axes[1].xaxis.get_majorticklabels(), rotation=90)
+        # sns.barplot(x='Category', y='Frequency', data=df_parsed, palette='viridis', ax=axes[0])
+        # axes[0].set_title('Road type parsed out of street name')
+        sns.barplot(x='Category', y='Frequency', data=df_osm, palette='viridis', ax=axes)
+        axes.set_title('Road type by Open Street Map (OSM)')
+        plt.setp(axes.xaxis.get_majorticklabels(), rotation=90)
         plt.tight_layout()
 
         if target_file_name is None:

@@ -9,4 +9,4 @@ exercises/airports.sqlite
 de.code-workspace
 DSB_Unfallatlas.pdf
 unfallorte_all.csv
-
+project/exploration_launcher.py

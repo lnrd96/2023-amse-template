@@ -1,5 +1,4 @@
 from tqdm import tqdm
-from database.model import DB
 import pandas as pd
 from decimal import Decimal
 from database.model import Accident, Coordinate, Participants

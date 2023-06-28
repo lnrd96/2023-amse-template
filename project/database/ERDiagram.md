@@ -5,6 +5,7 @@ erDiagram
 
     class PARTICIPANTS {
         bool predestrian
+        bool car
         bool truck
         bool motorcycle
         bool bike
