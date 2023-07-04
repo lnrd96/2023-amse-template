@@ -30,8 +30,7 @@ class Explorer():
             n_accidents (int, optional): Number of accidents to plot. Random draws. Defaults to 5000.
         """
 
-        query = Accident.select(Coordinate.wsg_long, Coordinate.wsg_lat, Accident.hour, Accident.road_type_osm, Accident.lighting_conditions, Accident.road_state).join(Coordinate).order_by(fn.Random()).limit(n_accidents) #, on=(Accident.location==Coordinate.id))
-        # query = Accident.select().order_by(fn.Random()).limit(n_accidents).join(Coordinate) #, on=(Accident.location==Coordinate.id))
+        query = Accident.select(Coordinate.wsg_long, Coordinate.wsg_lat, Accident.hour, Accident.road_type_osm, Accident.lighting_conditions, Accident.road_state).join(Coordinate).order_by(fn.Random()).limit(n_accidents)
         self._plot_query_on_map(query)
         return
         # plot germany
@@ -74,10 +73,9 @@ class Explorer():
                                 height=800,
                                 width=1200)
         fig.update_layout(mapbox_style="open-street-map")
-        fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
+        fig.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0})
         fig.show()
         return
-
 
         # plot germany
         world = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres'))
@@ -156,7 +154,7 @@ class Explorer():
         # define Seaborn color palette to use
         colors = sns.color_palette('pastel')[0:3]
         # create pie chart
-        explode = (0, 0, 0.1) 
+        explode = (0, 0, 0.1)
         plt.pie(data, labels=labels, colors=colors, autopct='%.0f%%', explode=explode)
         plt.show()
 

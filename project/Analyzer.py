@@ -34,8 +34,7 @@ class Analyzer():
         kmeans = KMeans(n_clusters=n_centers)
         kmeans.fit(X)
         labels = kmeans.labels_
-        centers = kmeans.cluster_centers_
-        
+
         import plotly.io as pio
         import plotly.express as px
 
@@ -55,9 +54,7 @@ class Analyzer():
         fig.update_layout(margin={})
         fig.show()
         return
-        
-        
-    
+
     def get_k_means_from_query(self, n_centers: int, query: peewee.ModelSelect, title='', markersize=1, ext_ax=None):
         """ Calculates clusters using k-means algorithm and plots them on a map.
 
@@ -66,7 +63,7 @@ class Analyzer():
             query (peewee.ModelSelect): The data. Must be a query from the Coordinate relation.
             title (str, optional): Title for the plot. Defaults to ''.
             markersize (int, optional): Size of accidents on map. Defaults to 1.
-            ext_ax (_type_, optional): An external matplotlib axes object to use. 
+            ext_ax (_type_, optional): An external matplotlib axes object to use.
                                        If not provided this function creates dedicated plot itself.
                                        Defaults to None.
         """
