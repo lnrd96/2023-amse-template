@@ -1,0 +1,174 @@
+
+
+pipeline MobileGeraete {
+
+    block MBExtractor oftype HttpExtractor {
+        url: "https://www.mowesta.com/data/measure/mowesta-dataset-20221107.zip";
+    } // File
+
+    pipe {
+        from: MBExtractor;
+        to: ZipArchiveInterpreter;
+    }
+
+    block ZipArchiveInterpreter oftype ArchiveInterpreter {
+        archiveType: "zip";
+    } // FileSystem
+
+    pipe {
+        from: ZipArchiveInterpreter;
+        to: MBFilePicker;
+    }
+
+    block MBFilePicker oftype FilePicker {
+        path: "/data.csv";
+    } // File
+
+    pipe {
+        from: MBFilePicker;
+        to: MBTextFileInterpreter;
+    } 
+    
+    block MBTextFileInterpreter oftype TextFileInterpreter {  
+
+    } // TextFile
+    
+    pipe {
+        from: MBTextFileInterpreter;
+        to: MBCSVInterpreter;
+    }
+
+    block MBCSVInterpreter oftype CSVInterpreter {  
+        delimiter: ";";
+    } // Sheet
+    
+    pipe {
+        from: MBCSVInterpreter;
+        to: MBColumnDeleter;
+    }
+
+    block MBColumnDeleter oftype ColumnDeleter {
+        delete: [column F, column G, column H, column I];
+    } // Sheet
+    
+    pipe {
+        from: MBColumnDeleter;
+        to: MBTableInterpreter;
+    }
+    
+    block MBTableInterpreter oftype TableInterpreter {
+        header: false;
+        columns: [
+            "Geraet" oftype integer,
+            "Hersteller" oftype text,
+            "Model" oftype text,
+            "Montat" oftype integer,
+            "Temperatur" oftype decimal,
+            "Batterietemperatur" oftype decimal,
+            "Geraet aktiv" oftype text,
+        ];
+    } // Table
+
+    pipe {
+        from: MBTableInterpreter;
+        to: TemperatureTransformer;
+    }
+
+  	block TemperatureTransformer oftype TableTransformer {
+		inputColumn: "Temperatur";
+		outputColumn: "Temperatur";
+		use: CelsuisToFahrenheit;
+	} // Table
+    
+    pipe {
+        from: TemperatureTransformer;
+        to: BatterieTemperatureTransformer;
+    }
+	
+    block BatterieTemperatureTransformer oftype TableTransformer {
+		inputColumn: "Batterietemperatur";
+		outputColumn: "Batterietemperatur";
+		use: CelsuisToFahrenheit;
+	} // Table
+
+	transform CelsuisToFahrenheit {
+		from celsius oftype decimal;
+		to fahrenheit oftype decimal;
+		fahrenheit:  (celsius  * 9 / 5) + 32;
+	} 
+
+    pipe {
+        from: BatterieTemperatureTransformer;
+        to: MBLoader;
+    }
+
+    block MBLoader oftype SQLiteLoader {
+        table: "temperatures";
+        file: "temperatures.sqlite";
+    } // Database
+
+}
+
+// Verkehr
+
+constraint VerkehrConstraintList oftype AllowlistConstraint {
+    allowlist: ["FV", "RV", "nur DPN"];  // list of valid values
+}
+
+valuetype VerkehrType oftype text {
+    constraints: [
+        VerkehrConstraintList,
+    ];
+}
+
+// Koordinaten
+
+constraint CoordinateRange oftype RangeConstraint {
+  lowerBound: -90;
+  upperBound: 90;      
+  lowerBoundInclusive: true;
+  upperBoundInclusive: true;
+}
+
+valuetype Coordinate oftype decimal {
+    constraints: [
+        CoordinateRange,
+    ];
+}
+
+// IFOPT
+
+constraint IFOPTMatch oftype RegexConstraint {
+  regex: /^[a-zA-Z]{2}:\d+:\d+(?::\d+)?$/;
+}
+
+valuetype IFOPTType oftype text {
+    constraints: [
+        IFOPTMatch,
+    ];
+}
+
+// Betreiber Nummer
+
+constraint BNummer oftype RangeConstraint {
+  lowerBound: 0;
+  lowerBoundInclusive: true;
+}
+
+valuetype GETZero oftype integer {  // workaround to remove empty cells
+    constraints: [
+        BNummer,
+    ];
+}
+
+// Betreiber Name
+
+constraint NoEmptyString oftype LengthConstraint {
+  minLength: 1;
+}
+
+valuetype StringExists oftype text { // workaround to remove empty cells
+    constraints: [
+        NoEmptyString,
+    ];
+}
