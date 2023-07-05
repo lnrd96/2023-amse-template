@@ -59,7 +59,7 @@ pipeline MobileGeraete {
     block MBTableInterpreter oftype TableInterpreter {
         header: false;
         columns: [
-            "Geraet" oftype integer,
+            "Geraet" oftype GTZ,
             "Hersteller" oftype text,
             "Model" oftype text,
             "Monat" oftype integer,
@@ -109,66 +109,15 @@ pipeline MobileGeraete {
 
 }
 
-// Verkehr
+// GTZ
 
-constraint VerkehrConstraintList oftype AllowlistConstraint {
-    allowlist: ["FV", "RV", "nur DPN"];  // list of valid values
-}
-
-valuetype VerkehrType oftype text {
-    constraints: [
-        VerkehrConstraintList,
-    ];
-}
-
-// Koordinaten
-
-constraint CoordinateRange oftype RangeConstraint {
-  lowerBound: -90;
-  upperBound: 90;      
-  lowerBoundInclusive: true;
-  upperBoundInclusive: true;
-}
-
-valuetype Coordinate oftype decimal {
-    constraints: [
-        CoordinateRange,
-    ];
-}
-
-// IFOPT
-
-constraint IFOPTMatch oftype RegexConstraint {
-  regex: /^[a-zA-Z]{2}:\d+:\d+(?::\d+)?$/;
-}
-
-valuetype IFOPTType oftype text {
-    constraints: [
-        IFOPTMatch,
-    ];
-}
-
-// Betreiber Nummer
-
-constraint BNummer oftype RangeConstraint {
+constraint GreaterThanZero oftype RangeConstraint {
   lowerBound: 0;
-  lowerBoundInclusive: true;
+  lowerBoundInclusive: false;
 }
 
-valuetype GETZero oftype integer {  // workaround to remove empty cells
+valuetype GTZ oftype integer {  // workaround to remove empty cells
     constraints: [
-        BNummer,
-    ];
-}
-
-// Betreiber Name
-
-constraint NoEmptyString oftype LengthConstraint {
-  minLength: 1;
-}
-
-valuetype StringExists oftype text { // workaround to remove empty cells
-    constraints: [
-        NoEmptyString,
+        GreaterThanZero,
     ];
 }
