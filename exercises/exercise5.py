@@ -7,7 +7,7 @@ import os
 
 DATA_URI = 'https://gtfs.rhoenenergie-bus.de/GTFS.zip'
 DATABASE_PATH = 'gtfs.sqlite'
-TABLE_NAME = 'stop'
+TABLE_NAME = 'stops'
 
 
 def automated_data_pipeline():
