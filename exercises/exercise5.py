@@ -1,9 +1,9 @@
-import sys
 import urllib.request
+import shutil
 import zipfile
 import pandas as pd
 import sqlite3
-import io
+import os
 
 DATA_URI = 'https://gtfs.rhoenenergie-bus.de/GTFS.zip'
 DATABASE_PATH = 'gtfs.sqlite'
@@ -28,7 +28,7 @@ def automated_data_pipeline():
     df = df[df['zone_id'] == 2001]
 
     # validate that string field `stop_name` contains actually only alphabetic text
-    df = df[df['stop_name'].str.match(r'^[A-Za-z\säöüÄÖÜ-/]+$')]  # set of charecters to allow
+    df = df[df['stop_name'].str.match(r'^[A-Za-z\säöüÄÖÜ\/-]+$')]  # set of charecters to allow
 
     # validate coordinate value range
     min_val, max_val = -90.0, 90.0
@@ -44,6 +44,10 @@ def automated_data_pipeline():
     df.to_sql(TABLE_NAME, conn, if_exists='replace', index=False, dtype=column_types)
     conn.close()
     print('Saved data into database.')
+
+    # clean artifacts
+    shutil.rmtree('data')
+    os.remove('data.zip')
 
 
 if __name__ == '__main__':
