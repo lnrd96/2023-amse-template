@@ -1,4 +1,8 @@
-# Project Plan
+# Traffic Accidents in Germany
+
+## Quick Start
+You may directly check out the [data analysis notebook](https://github.com/lnrd96/Data-Engineering-Project-on-Traffic-Accidents/blob/main/project/report.ipynb]). There, the data analysis is performed and conclusions are drawn.
+The [data pipeline](https://github.com/lnrd96/Data-Engineering-Project-on-Traffic-Accidents/blob/main/project/Pipeline.py) is independent of it as the jupyter notebook assumes the data to be present in the database. That is achieved in the linked class, `Pipeline.py`, which downloads, preprocesses and structures the data before persisting it.
 
 ## Summary
 This project explores characteristics of traffic accidents in germany.  Moreover investigates correlations between the accidents and the types of roads they took place.
